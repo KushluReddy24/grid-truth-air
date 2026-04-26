@@ -134,3 +134,14 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Leaflet panes use z-index up to 700; ensure Radix dialogs/popovers render above the map */
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom,
+.leaflet-control {
+  z-index: 1 !important;
+}
+.leaflet-tooltip {
+  z-index: 2 !important;
+}
