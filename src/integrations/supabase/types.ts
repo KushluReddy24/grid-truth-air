@@ -14,16 +14,236 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      emissions: {
+        Row: {
+          confidence_score: number | null
+          grid_id: string
+          id: string
+          industry_name: string | null
+          pollutant: string
+          source_type: Database["public"]["Enums"]["source_type"]
+          updated_at: string
+          value_kg_per_day: number
+        }
+        Insert: {
+          confidence_score?: number | null
+          grid_id: string
+          id?: string
+          industry_name?: string | null
+          pollutant?: string
+          source_type: Database["public"]["Enums"]["source_type"]
+          updated_at?: string
+          value_kg_per_day?: number
+        }
+        Update: {
+          confidence_score?: number | null
+          grid_id?: string
+          id?: string
+          industry_name?: string | null
+          pollutant?: string
+          source_type?: Database["public"]["Enums"]["source_type"]
+          updated_at?: string
+          value_kg_per_day?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emissions_grid_id_fkey"
+            columns: ["grid_id"]
+            isOneToOne: false
+            referencedRelation: "grids"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      grids: {
+        Row: {
+          area_name: string | null
+          created_at: string
+          grid_code: string
+          id: string
+          lat: number
+          lng: number
+        }
+        Insert: {
+          area_name?: string | null
+          created_at?: string
+          grid_code: string
+          id?: string
+          lat: number
+          lng: number
+        }
+        Update: {
+          area_name?: string | null
+          created_at?: string
+          grid_code?: string
+          id?: string
+          lat?: number
+          lng?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+          organization: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id: string
+          name: string
+          organization?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          organization?: string | null
+        }
+        Relationships: []
+      }
+      submissions: {
+        Row: {
+          confidence_score: number | null
+          contributor_id: string
+          created_at: string
+          grid_id: string
+          id: string
+          industry_name: string | null
+          notes: string | null
+          parameters: Json | null
+          pollutant: string
+          review_comment: string | null
+          reviewed_at: string | null
+          reviewer_id: string | null
+          source_type: Database["public"]["Enums"]["source_type"]
+          status: Database["public"]["Enums"]["submission_status"]
+          value_kg_per_day: number
+        }
+        Insert: {
+          confidence_score?: number | null
+          contributor_id: string
+          created_at?: string
+          grid_id: string
+          id?: string
+          industry_name?: string | null
+          notes?: string | null
+          parameters?: Json | null
+          pollutant?: string
+          review_comment?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          source_type: Database["public"]["Enums"]["source_type"]
+          status?: Database["public"]["Enums"]["submission_status"]
+          value_kg_per_day: number
+        }
+        Update: {
+          confidence_score?: number | null
+          contributor_id?: string
+          created_at?: string
+          grid_id?: string
+          id?: string
+          industry_name?: string | null
+          notes?: string | null
+          parameters?: Json | null
+          pollutant?: string
+          review_comment?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          source_type?: Database["public"]["Enums"]["source_type"]
+          status?: Database["public"]["Enums"]["submission_status"]
+          value_kg_per_day?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submissions_grid_id_fkey"
+            columns: ["grid_id"]
+            isOneToOne: false
+            referencedRelation: "grids"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      verification_logs: {
+        Row: {
+          action: Database["public"]["Enums"]["submission_status"]
+          comment: string | null
+          confidence_score: number | null
+          created_at: string
+          id: string
+          reviewer_id: string
+          submission_id: string
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["submission_status"]
+          comment?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          id?: string
+          reviewer_id: string
+          submission_id: string
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["submission_status"]
+          comment?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          id?: string
+          reviewer_id?: string
+          submission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "verification_logs_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "public_user" | "contributor" | "verifier"
+      source_type: "industry" | "transport" | "domestic" | "road_dust" | "other"
+      submission_status: "pending" | "approved" | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +370,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["public_user", "contributor", "verifier"],
+      source_type: ["industry", "transport", "domestic", "road_dust", "other"],
+      submission_status: ["pending", "approved", "rejected"],
+    },
   },
 } as const
