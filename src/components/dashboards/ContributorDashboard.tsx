@@ -59,8 +59,12 @@ export function ContributorDashboard() {
     }
     setSubmitting(true);
     const { error } = await supabase.from("submissions").insert({
-      ...parsed.data,
       contributor_id: user!.id,
+      grid_id: parsed.data.grid_id,
+      source_type: parsed.data.source_type,
+      industry_name: parsed.data.industry_name,
+      value_kg_per_day: parsed.data.value_kg_per_day,
+      notes: parsed.data.notes,
       pollutant: "PM10",
     });
     setSubmitting(false);
