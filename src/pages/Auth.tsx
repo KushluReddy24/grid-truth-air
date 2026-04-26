@@ -21,7 +21,7 @@ const signupSchema = z.object({
 });
 
 const loginSchema = z.object({
-  email: z.string().trim().email().max(255),
+  email: z.string().trim().email().max(255).nonempty(),
   password: z.string().min(1).max(72),
 });
 
