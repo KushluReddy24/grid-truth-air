@@ -82,6 +82,44 @@ export type Database = {
         }
         Relationships: []
       }
+      industries: {
+        Row: {
+          category: string
+          created_at: string
+          grid_id: string | null
+          id: string
+          lat: number
+          lng: number
+          name: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          grid_id?: string | null
+          id?: string
+          lat: number
+          lng: number
+          name: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          grid_id?: string | null
+          id?: string
+          lat?: number
+          lng?: number
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industries_grid_id_fkey"
+            columns: ["grid_id"]
+            isOneToOne: false
+            referencedRelation: "grids"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -238,6 +276,16 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      list_industries_public: {
+        Args: never
+        Returns: {
+          category: string
+          grid_id: string
+          id: string
+          lat: number
+          lng: number
+        }[]
       }
     }
     Enums: {
