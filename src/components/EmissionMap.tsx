@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { MapContainer, TileLayer, Rectangle, Tooltip, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Polygon, Polyline, CircleMarker, Tooltip, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { supabase } from "@/integrations/supabase/client";
 import { emissionColor, emissionLabel } from "@/lib/emissions";
 import { GridDetailDialog } from "./GridDetailDialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BOUNDARY, SURVEY_GRIDS } from "@/data/surveyArea";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface Grid {
   id: string;
@@ -24,39 +26,57 @@ export interface EmissionRow {
   confidence_score: number | null;
 }
 
-const CELL = 0.01; // ~1km cell half-size approximation
+export interface IndustryPoint {
+  id: string;
+  category: string;
+  lat: number;
+  lng: number;
+  grid_id: string | null;
+  name?: string | null;
+}
 
-function FitBounds({ grids }: { grids: Grid[] }) {
+function FitBounds() {
   const map = useMap();
   useEffect(() => {
-    if (!grids.length) return;
-    const lats = grids.map((g) => g.lat);
-    const lngs = grids.map((g) => g.lng);
-    map.fitBounds([
-      [Math.min(...lats) - CELL, Math.min(...lngs) - CELL],
-      [Math.max(...lats) + CELL, Math.max(...lngs) + CELL],
-    ], { padding: [20, 20] });
-  }, [grids, map]);
+    if (!BOUNDARY.length) return;
+    const lats = BOUNDARY.map((c) => c[0]);
+    const lngs = BOUNDARY.map((c) => c[1]);
+    map.fitBounds(
+      [
+        [Math.min(...lats), Math.min(...lngs)],
+        [Math.max(...lats), Math.max(...lngs)],
+      ],
+      { padding: [24, 24] }
+    );
+  }, [map]);
   return null;
 }
 
 export function EmissionMap() {
+  const { role } = useAuth();
+  const isVerifier = role === "verifier";
+
   const [grids, setGrids] = useState<Grid[]>([]);
   const [emissions, setEmissions] = useState<EmissionRow[]>([]);
+  const [industries, setIndustries] = useState<IndustryPoint[]>([]);
   const [selected, setSelected] = useState<Grid | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
-      const [{ data: g }, { data: e }] = await Promise.all([
+      const [gRes, eRes, iRes] = await Promise.all([
         supabase.from("grids").select("*"),
         supabase.from("emissions").select("*"),
+        isVerifier
+          ? supabase.from("industries").select("id, category, lat, lng, grid_id, name")
+          : (supabase.from("industries_public" as never).select("id, category, lat, lng, grid_id") as unknown as Promise<{ data: IndustryPoint[] | null }>),
       ]);
-      setGrids(g ?? []);
-      setEmissions(e ?? []);
+      setGrids((gRes.data as Grid[]) ?? []);
+      setEmissions((eRes.data as EmissionRow[]) ?? []);
+      setIndustries(((iRes as { data: IndustryPoint[] | null }).data) ?? []);
       setLoading(false);
     })();
-  }, []);
+  }, [isVerifier]);
 
   const totals = useMemo(() => {
     const m = new Map<string, number>();
@@ -66,14 +86,31 @@ export function EmissionMap() {
     return m;
   }, [emissions]);
 
+  const industriesByGrid = useMemo(() => {
+    const m = new Map<string, IndustryPoint[]>();
+    for (const ind of industries) {
+      if (!ind.grid_id) continue;
+      const arr = m.get(ind.grid_id) ?? [];
+      arr.push(ind);
+      m.set(ind.grid_id, arr);
+    }
+    return m;
+  }, [industries]);
+
+  const gridByCode = useMemo(() => {
+    const m = new Map<string, Grid>();
+    for (const g of grids) m.set(g.grid_code, g);
+    return m;
+  }, [grids]);
+
   if (loading) return <Skeleton className="h-[500px] w-full rounded-xl" />;
 
   return (
     <>
       <div className="relative h-[500px] w-full rounded-xl overflow-hidden border border-border shadow-elegant">
         <MapContainer
-          center={[17.51, 78.45]}
-          zoom={13}
+          center={[17.521, 78.452]}
+          zoom={14}
           className="h-full w-full"
           scrollWheelZoom
         >
@@ -81,37 +118,76 @@ export function EmissionMap() {
             attribution='&copy; OpenStreetMap'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <FitBounds grids={grids} />
-          {grids.map((g) => {
-            const total = totals.get(g.id) ?? 0;
+          <FitBounds />
+
+          {/* Survey area boundary (JEEDIMETLA IDA 19) */}
+          <Polyline
+            positions={BOUNDARY}
+            pathOptions={{ color: "#22d3ee", weight: 3, opacity: 0.9, dashArray: "6 4" }}
+          />
+
+          {/* Real surveyed grid cells from KML */}
+          {SURVEY_GRIDS.map((sg) => {
+            const dbGrid = gridByCode.get(sg.code);
+            const total = dbGrid ? totals.get(dbGrid.id) ?? 0 : 0;
+            const indCount = dbGrid ? industriesByGrid.get(dbGrid.id)?.length ?? 0 : 0;
             const color = emissionColor(total);
-            const bounds: [[number, number], [number, number]] = [
-              [g.lat - CELL, g.lng - CELL],
-              [g.lat + CELL, g.lng + CELL],
-            ];
+            const baseOpacity = total > 0 ? 0.45 : 0.18;
             return (
-              <Rectangle
-                key={g.id}
-                bounds={bounds}
+              <Polygon
+                key={sg.code}
+                positions={sg.coords}
                 pathOptions={{
                   color,
                   weight: 2,
                   fillColor: color,
-                  fillOpacity: 0.45,
+                  fillOpacity: baseOpacity,
                 }}
                 eventHandlers={{
-                  click: () => setSelected(g),
+                  click: () => dbGrid && setSelected(dbGrid),
                   mouseover: (ev) => ev.target.setStyle({ fillOpacity: 0.7 }),
-                  mouseout: (ev) => ev.target.setStyle({ fillOpacity: 0.45 }),
+                  mouseout: (ev) => ev.target.setStyle({ fillOpacity: baseOpacity }),
+                }}
+              >
+                <Tooltip direction="top" opacity={0.95} sticky>
+                  <div className="text-xs">
+                    <div className="font-semibold">Grid {sg.code}</div>
+                    <div>
+                      {total.toFixed(1)} kg/day · {emissionLabel(total)}
+                    </div>
+                    <div className="text-muted-foreground">{indCount} industries</div>
+                  </div>
+                </Tooltip>
+              </Polygon>
+            );
+          })}
+
+          {/* Industry markers */}
+          {industries.map((ind) => {
+            const isRed = ind.category === "red";
+            return (
+              <CircleMarker
+                key={ind.id}
+                center={[ind.lat, ind.lng]}
+                radius={isRed ? 5 : 3}
+                pathOptions={{
+                  color: isRed ? "#ef4444" : "#94a3b8",
+                  fillColor: isRed ? "#ef4444" : "#cbd5e1",
+                  fillOpacity: 0.9,
+                  weight: 1,
                 }}
               >
                 <Tooltip direction="top" opacity={0.95}>
-                  <div className="text-xs">
-                    <div className="font-semibold">{g.grid_code}</div>
-                    <div>{total.toFixed(1)} kg/day · {emissionLabel(total)}</div>
+                  <div className="text-[11px]">
+                    <span className="font-semibold">
+                      {isRed ? "Red category" : "Industry"}
+                    </span>
+                    {isVerifier && ind.name && (
+                      <div className="text-muted-foreground">{ind.name}</div>
+                    )}
                   </div>
                 </Tooltip>
-              </Rectangle>
+              </CircleMarker>
             );
           })}
         </MapContainer>
@@ -120,8 +196,19 @@ export function EmissionMap() {
         <div className="absolute bottom-4 right-4 z-[400] rounded-lg bg-card/95 backdrop-blur p-3 shadow-elegant border border-border">
           <div className="text-xs font-semibold mb-2">PM10 (kg/day)</div>
           <div className="h-2 w-32 rounded bg-gradient-emission mb-1" />
-          <div className="flex justify-between text-[10px] text-muted-foreground">
-            <span>Low</span><span>Severe</span>
+          <div className="flex justify-between text-[10px] text-muted-foreground mb-2">
+            <span>Low</span>
+            <span>Severe</span>
+          </div>
+          <div className="text-[10px] text-muted-foreground space-y-1">
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-2 w-2 rounded-full bg-[#ef4444]" />
+              Red-category industry
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-2 w-2 rounded-full bg-[#94a3b8]" />
+              Other industry
+            </div>
           </div>
         </div>
       </div>
@@ -129,6 +216,21 @@ export function EmissionMap() {
       <GridDetailDialog
         grid={selected}
         emissions={emissions.filter((e) => e.grid_id === selected?.id)}
+        industryCount={
+          selected ? industriesByGrid.get(selected.id)?.length ?? 0 : 0
+        }
+        redIndustryCount={
+          selected
+            ? industriesByGrid.get(selected.id)?.filter((i) => i.category === "red").length ?? 0
+            : 0
+        }
+        industryNames={
+          selected && isVerifier
+            ? (industriesByGrid.get(selected.id) ?? [])
+                .map((i) => i.name)
+                .filter((n): n is string => !!n)
+            : []
+        }
         onClose={() => setSelected(null)}
       />
     </>
