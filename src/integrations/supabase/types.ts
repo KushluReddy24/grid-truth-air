@@ -267,7 +267,38 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      industries_public: {
+        Row: {
+          category: string | null
+          grid_id: string | null
+          id: string | null
+          lat: number | null
+          lng: number | null
+        }
+        Insert: {
+          category?: string | null
+          grid_id?: string | null
+          id?: string | null
+          lat?: number | null
+          lng?: number | null
+        }
+        Update: {
+          category?: string | null
+          grid_id?: string | null
+          id?: string | null
+          lat?: number | null
+          lng?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industries_grid_id_fkey"
+            columns: ["grid_id"]
+            isOneToOne: false
+            referencedRelation: "grids"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       has_role: {
@@ -276,16 +307,6 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
-      }
-      list_industries_public: {
-        Args: never
-        Returns: {
-          category: string
-          grid_id: string
-          id: string
-          lat: number
-          lng: number
-        }[]
       }
     }
     Enums: {
