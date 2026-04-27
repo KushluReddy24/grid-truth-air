@@ -15,10 +15,16 @@ const ICONS: Record<string, React.ElementType> = {
 export function GridDetailDialog({
   grid,
   emissions,
+  industryCount,
+  redIndustryCount,
+  industryNames,
   onClose,
 }: {
   grid: Grid | null;
   emissions: EmissionRow[];
+  industryCount: number;
+  redIndustryCount: number;
+  industryNames: string[];
   onClose: () => void;
 }) {
   const { role } = useAuth();
@@ -69,10 +75,26 @@ export function GridDetailDialog({
           </div>
         </div>
 
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <div className="rounded-lg border border-border p-3 bg-card">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Industries</div>
+            <div className="text-xl font-semibold">{industryCount}</div>
+          </div>
+          <div className="rounded-lg border border-border p-3 bg-card">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Red category</div>
+            <div className="text-xl font-semibold text-[hsl(var(--emiq-extreme))]">{redIndustryCount}</div>
+          </div>
+        </div>
+
         <div className="space-y-2">
           <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
             Source breakdown
           </div>
+          {emissions.length === 0 && (
+            <div className="text-xs text-muted-foreground rounded-lg border border-dashed border-border p-3">
+              No verified emissions recorded for this grid yet.
+            </div>
+          )}
           {aggregated.map((e) => {
             const Icon = ICONS[e.source_type] ?? Wind;
             const pct = total > 0 ? (Number(e.value_kg_per_day) / total) * 100 : 0;
@@ -103,9 +125,22 @@ export function GridDetailDialog({
           })}
         </div>
 
-        {!canSeeIndustry && (
+        {canSeeIndustry && industryNames.length > 0 && (
+          <div className="mt-3">
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+              Industries in this grid
+            </div>
+            <div className="max-h-32 overflow-y-auto rounded-lg border border-border bg-card p-2 text-xs space-y-0.5">
+              {industryNames.map((n, i) => (
+                <div key={i} className="truncate text-foreground/90">{n}</div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!canSeeIndustry && industryCount > 0 && (
           <p className="text-xs text-muted-foreground mt-2">
-            Industry-level breakdown is restricted. Verifiers can view per-industry attribution.
+            {industryCount} industries surveyed in this grid. Verifiers can see industry-level names and attribution.
           </p>
         )}
       </DialogContent>
