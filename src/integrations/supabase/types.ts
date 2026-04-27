@@ -82,6 +82,44 @@ export type Database = {
         }
         Relationships: []
       }
+      industries: {
+        Row: {
+          category: string
+          created_at: string
+          grid_id: string | null
+          id: string
+          lat: number
+          lng: number
+          name: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          grid_id?: string | null
+          id?: string
+          lat: number
+          lng: number
+          name: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          grid_id?: string | null
+          id?: string
+          lat?: number
+          lng?: number
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industries_grid_id_fkey"
+            columns: ["grid_id"]
+            isOneToOne: false
+            referencedRelation: "grids"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -229,7 +267,38 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      industries_public: {
+        Row: {
+          category: string | null
+          grid_id: string | null
+          id: string | null
+          lat: number | null
+          lng: number | null
+        }
+        Insert: {
+          category?: string | null
+          grid_id?: string | null
+          id?: string | null
+          lat?: number | null
+          lng?: number | null
+        }
+        Update: {
+          category?: string | null
+          grid_id?: string | null
+          id?: string | null
+          lat?: number | null
+          lng?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "industries_grid_id_fkey"
+            columns: ["grid_id"]
+            isOneToOne: false
+            referencedRelation: "grids"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       has_role: {
