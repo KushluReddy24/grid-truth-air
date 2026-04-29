@@ -1,6 +1,4 @@
-import { EmissionMap } from "@/components/EmissionMap";
 import { JeedimetlaLayoutMap } from "@/components/JeedimetlaLayoutMap";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Activity, Grid3x3, Wind } from "lucide-react";
@@ -35,18 +33,7 @@ export function PublicDashboard() {
         <StatCard icon={Wind} label="Source types" value={stats.sources.toString()} />
       </div>
 
-      <Tabs defaultValue="layout" className="w-full">
-        <TabsList>
-          <TabsTrigger value="layout">Survey layout</TabsTrigger>
-          <TabsTrigger value="geo">Geographic map</TabsTrigger>
-        </TabsList>
-        <TabsContent value="layout" className="mt-4">
-          <JeedimetlaLayoutMap />
-        </TabsContent>
-        <TabsContent value="geo" className="mt-4">
-          <EmissionMap />
-        </TabsContent>
-      </Tabs>
+      <JeedimetlaLayoutMap />
     </div>
   );
 }
