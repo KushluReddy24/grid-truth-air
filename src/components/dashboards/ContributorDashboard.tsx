@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { EmissionMap } from "@/components/EmissionMap";
+import { JeedimetlaLayoutMap } from "@/components/JeedimetlaLayoutMap";
 
 const schema = z.object({
   grid_id: z.string().uuid("Select a grid"),
@@ -88,7 +89,8 @@ export function ContributorDashboard() {
         <TabsList>
           <TabsTrigger value="submit">New submission</TabsTrigger>
           <TabsTrigger value="mine">My submissions ({subs.length})</TabsTrigger>
-          <TabsTrigger value="map">Map</TabsTrigger>
+          <TabsTrigger value="layout">Survey layout</TabsTrigger>
+          <TabsTrigger value="map">Geographic map</TabsTrigger>
         </TabsList>
 
         <TabsContent value="submit" className="mt-4">
@@ -177,6 +179,10 @@ export function ContributorDashboard() {
 
         <TabsContent value="map" className="mt-4">
           <EmissionMap />
+        </TabsContent>
+
+        <TabsContent value="layout" className="mt-4">
+          <JeedimetlaLayoutMap />
         </TabsContent>
       </Tabs>
     </div>
