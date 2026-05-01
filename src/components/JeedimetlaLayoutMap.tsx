@@ -27,13 +27,14 @@ const METRIC_OPTIONS: Array<{ value: MapMetric; label: string }> = [
 ];
 
 // Per-metric color thresholds (kg/day). "total" stays on the original scale.
-const THRESHOLDS: Record<MapMetric, [number, number, number]> = {
+const THRESHOLDS: Record<MapMetric | "VOC", [number, number, number]> = {
   total: [1, 50, 200],
   PM10: [0.5, 5, 25],
   PM2_5: [0.2, 2, 10],
   SO2: [0.5, 5, 25],
   NO2: [0.5, 5, 25],
   CO: [1, 10, 50],
+  VOC: [0.5, 5, 25],
 };
 
 function intensityColor(value: number, metric: MapMetric) {
@@ -66,7 +67,7 @@ export function JeedimetlaLayoutMap() {
   const grandTotal = useMemo(
     () =>
       Object.values(BOX_EMISSIONS).reduce(
-        (a, b) => a + Number((b.totals as Record<string, number>)?.[metric] ?? 0),
+        (a, b) => a + Number((b.totals as unknown as Record<string, number>)?.[metric] ?? 0),
         0
       ),
     [metric]
@@ -151,7 +152,7 @@ export function JeedimetlaLayoutMap() {
               draggable={false}
             />
             {boxes.map(({ n, x, y, data }) => {
-              const value = data ? Number((data.totals as Record<string, number>)?.[metric] ?? 0) : 0;
+              const value = data ? Number((data.totals as unknown as Record<string, number>)?.[metric] ?? 0) : 0;
               const has = !!data;
               const size = has ? Math.min(3.2, 1.4 + Math.log10(1 + value) * 0.8) : 1.0;
               return (
