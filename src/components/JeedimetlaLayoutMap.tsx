@@ -232,8 +232,13 @@ export function JeedimetlaLayoutMap() {
 
               {canSeeIndustries ? (
                 <div className="mt-3">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                    Industries in this grid ({selectedData.industries.length})
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Industries in this grid
+                    </div>
+                    <div className="text-xs font-semibold tabular-nums">
+                      {selectedData.industries.length} {selectedData.industries.length === 1 ? "industry" : "industries"}
+                    </div>
                   </div>
                   <div className="rounded-lg border border-border overflow-hidden">
                     <div className="overflow-x-auto">
@@ -262,6 +267,21 @@ export function JeedimetlaLayoutMap() {
                             </tr>
                           ))}
                         </tbody>
+                        <tfoot>
+                          <tr className="bg-secondary/80 border-t-2 border-border">
+                            <td className="px-2 py-2 font-bold uppercase text-[10px] tracking-wider">
+                              Grid total
+                            </td>
+                            {POLLUTANTS.map((p) => (
+                              <td key={p.key} className="px-2 py-2 text-right font-bold tabular-nums">
+                                {Number(selectedData.totals[p.key] ?? 0).toFixed(2)}
+                              </td>
+                            ))}
+                            <td className="px-2 py-2 text-right font-bold tabular-nums">
+                              {Number(selectedData.totals.total ?? 0).toFixed(2)}
+                            </td>
+                          </tr>
+                        </tfoot>
                       </table>
                     </div>
                   </div>
