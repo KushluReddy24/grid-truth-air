@@ -151,29 +151,21 @@ export function JeedimetlaLayoutMap() {
               className="absolute inset-0 w-full h-full object-contain pointer-events-none"
               draggable={false}
             />
-            {boxes.map(({ n, x, y, data }) => {
-              const value = data ? Number((data.totals as unknown as Record<string, number>)?.[metric] ?? 0) : 0;
-              const has = !!data;
-              const size = has ? Math.min(3.2, 1.4 + Math.log10(1 + value) * 0.8) : 1.0;
-              return (
-                <button
-                  key={n}
-                  onClick={() => has && setSelected(n)}
-                  disabled={!has}
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-transform ${has ? "cursor-pointer hover:scale-125 hover:ring-2 hover:ring-primary" : "cursor-default opacity-40"}`}
-                  style={{
-                    left: `${x * 100}%`,
-                    top: `${y * 100}%`,
-                    width: `${size}%`,
-                    height: `${size * (3200 / 2263)}%`,
-                    backgroundColor: has ? intensityColor(value, metric) : "transparent",
-                    border: has ? "1.5px solid hsl(var(--foreground) / 0.6)" : "1px dashed hsl(var(--muted-foreground) / 0.4)",
-                  }}
-                  title={has ? `Box ${n} · ${metricLabel} ${value.toFixed(2)} kg/day` : `Box ${n} · no data`}
-                  aria-label={`Box ${n}`}
-                />
-              );
-            })}
+            {boxes
+              .filter(({ data }) => !!data)
+              .map(({ n, x, y, data }) => {
+                const value = Number((data!.totals as unknown as Record<string, number>)?.[metric] ?? 0);
+                return (
+                  <button
+                    key={n}
+                    onClick={() => setSelected(n)}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 w-[2.2%] h-[2.2%] rounded-sm bg-transparent hover:ring-2 hover:ring-primary cursor-pointer"
+                    style={{ left: `${x * 100}%`, top: `${y * 100}%` }}
+                    title={`Box ${n} · ${metricLabel} ${value.toFixed(2)} kg/day`}
+                    aria-label={`Box ${n}`}
+                  />
+                );
+              })}
           </div>
 
           {/* Legend */}
