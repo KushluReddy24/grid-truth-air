@@ -4,6 +4,7 @@ import { BOX_POSITIONS, BOX_EMISSIONS, type BoxData } from "@/data/jeedimetlaLay
 import { useAuth } from "@/contexts/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const POLLUTANTS: Array<{ key: keyof Omit<BoxData["totals"], "total">; label: string; color: string }> = [
   { key: "PM10", label: "PM10", color: "hsl(var(--emiq-extreme))" },
@@ -14,11 +15,34 @@ const POLLUTANTS: Array<{ key: keyof Omit<BoxData["totals"], "total">; label: st
   { key: "VOC", label: "VOC", color: "hsl(var(--accent))" },
 ];
 
-function intensityColor(total: number) {
-  if (total <= 0) return "transparent";
-  if (total < 1) return "hsl(var(--emiq-low) / 0.45)";
-  if (total < 50) return "hsl(var(--emiq-mid) / 0.55)";
-  if (total < 200) return "hsl(var(--emiq-high) / 0.65)";
+type PollutantKey = keyof Omit<BoxData["totals"], "total">;
+type MapMetric = "total" | PollutantKey;
+
+const METRIC_OPTIONS: Array<{ value: MapMetric; label: string }> = [
+  { value: "PM2_5", label: "PM2.5" },
+  { value: "PM10", label: "PM10" },
+  { value: "SO2", label: "SO₂" },
+  { value: "NO2", label: "NO₂" },
+  { value: "CO", label: "CO" },
+];
+
+// Per-metric color thresholds (kg/day). "total" stays on the original scale.
+const THRESHOLDS: Record<MapMetric | "VOC", [number, number, number]> = {
+  total: [1, 50, 200],
+  PM10: [0.5, 5, 25],
+  PM2_5: [0.2, 2, 10],
+  SO2: [0.5, 5, 25],
+  NO2: [0.5, 5, 25],
+  CO: [1, 10, 50],
+  VOC: [0.5, 5, 25],
+};
+
+function intensityColor(value: number, metric: MapMetric) {
+  if (value <= 0) return "transparent";
+  const [a, b, c] = THRESHOLDS[metric];
+  if (value < a) return "hsl(var(--emiq-low) / 0.45)";
+  if (value < b) return "hsl(var(--emiq-mid) / 0.55)";
+  if (value < c) return "hsl(var(--emiq-high) / 0.65)";
   return "hsl(var(--emiq-extreme) / 0.75)";
 }
 
@@ -30,6 +54,7 @@ export function JeedimetlaLayoutMap() {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState<{ x: number; y: number } | null>(null);
+  const [metric, setMetric] = useState<MapMetric>("PM2_5");
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const boxes = useMemo(
@@ -37,9 +62,15 @@ export function JeedimetlaLayoutMap() {
     []
   );
 
+  const metricLabel = METRIC_OPTIONS.find((o) => o.value === metric)?.label ?? "Total";
+
   const grandTotal = useMemo(
-    () => Object.values(BOX_EMISSIONS).reduce((a, b) => a + (b.totals?.total ?? 0), 0),
-    []
+    () =>
+      Object.values(BOX_EMISSIONS).reduce(
+        (a, b) => a + Number((b.totals as unknown as Record<string, number>)?.[metric] ?? 0),
+        0
+      ),
+    [metric]
   );
 
   const onWheel = (e: React.WheelEvent) => {
@@ -60,10 +91,22 @@ export function JeedimetlaLayoutMap() {
           <div>
             <div className="text-sm font-semibold">JEEDIMETLA IDA — Survey Layout</div>
             <div className="text-xs text-muted-foreground">
-              {Object.keys(BOX_EMISSIONS).length} surveyed boxes · total {grandTotal.toFixed(1)} kg/day
+              {Object.keys(BOX_EMISSIONS).length} surveyed boxes · {metricLabel} total {grandTotal.toFixed(1)} kg/day
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
+            <Select value={metric} onValueChange={(v) => setMetric(v as MapMetric)}>
+              <SelectTrigger className="h-8 w-[130px] text-xs">
+                <SelectValue placeholder="Pollutant" />
+              </SelectTrigger>
+              <SelectContent>
+                {METRIC_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value} className="text-xs">
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <button
               onClick={() => setZoom((z) => Math.max(1, z - 0.3))}
               className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border bg-card hover:bg-secondary"
@@ -109,9 +152,9 @@ export function JeedimetlaLayoutMap() {
               draggable={false}
             />
             {boxes.map(({ n, x, y, data }) => {
-              const total = data?.totals?.total ?? 0;
+              const value = data ? Number((data.totals as unknown as Record<string, number>)?.[metric] ?? 0) : 0;
               const has = !!data;
-              const size = has ? Math.min(3.2, 1.4 + Math.log10(1 + total) * 0.6) : 1.0;
+              const size = has ? Math.min(3.2, 1.4 + Math.log10(1 + value) * 0.8) : 1.0;
               return (
                 <button
                   key={n}
@@ -123,10 +166,10 @@ export function JeedimetlaLayoutMap() {
                     top: `${y * 100}%`,
                     width: `${size}%`,
                     height: `${size * (3200 / 2263)}%`,
-                    backgroundColor: has ? intensityColor(total) : "transparent",
+                    backgroundColor: has ? intensityColor(value, metric) : "transparent",
                     border: has ? "1.5px solid hsl(var(--foreground) / 0.6)" : "1px dashed hsl(var(--muted-foreground) / 0.4)",
                   }}
-                  title={has ? `Box ${n} · ${total.toFixed(1)} kg/day` : `Box ${n} · no data`}
+                  title={has ? `Box ${n} · ${metricLabel} ${value.toFixed(2)} kg/day` : `Box ${n} · no data`}
                   aria-label={`Box ${n}`}
                 />
               );
@@ -135,14 +178,17 @@ export function JeedimetlaLayoutMap() {
 
           {/* Legend */}
           <div className="absolute bottom-3 right-3 z-10 rounded-lg bg-card/95 backdrop-blur p-3 shadow-elegant border border-border">
-            <div className="text-[10px] font-semibold uppercase tracking-wider mb-2">Total pollution (kg/day)</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider mb-2">{metricLabel} (kg/day)</div>
             <div className="space-y-1 text-[10px]">
-              {[
-                { c: "hsl(var(--emiq-low) / 0.7)", l: "< 1" },
-                { c: "hsl(var(--emiq-mid) / 0.7)", l: "1 – 50" },
-                { c: "hsl(var(--emiq-high) / 0.7)", l: "50 – 200" },
-                { c: "hsl(var(--emiq-extreme) / 0.8)", l: "> 200" },
-              ].map((row) => (
+              {(() => {
+                const [a, b, c] = THRESHOLDS[metric];
+                return [
+                  { c: "hsl(var(--emiq-low) / 0.7)", l: `< ${a}` },
+                  { c: "hsl(var(--emiq-mid) / 0.7)", l: `${a} – ${b}` },
+                  { c: "hsl(var(--emiq-high) / 0.7)", l: `${b} – ${c}` },
+                  { c: "hsl(var(--emiq-extreme) / 0.8)", l: `> ${c}` },
+                ];
+              })().map((row) => (
                 <div key={row.l} className="flex items-center gap-2">
                   <span className="inline-block h-3 w-3 rounded-full border border-foreground/40" style={{ backgroundColor: row.c }} />
                   {row.l}
