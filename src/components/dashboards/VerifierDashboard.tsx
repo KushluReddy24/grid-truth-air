@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { EmissionMap } from "@/components/EmissionMap";
+import { JeedimetlaLayoutMap } from "@/components/JeedimetlaLayoutMap";
 import { StatusBadge } from "./ContributorDashboard";
 import { CheckCircle2, XCircle } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
@@ -116,6 +117,7 @@ export function VerifierDashboard() {
       <Tabs defaultValue="queue">
         <TabsList>
           <TabsTrigger value="queue">Review queue</TabsTrigger>
+          <TabsTrigger value="layout">Survey layout</TabsTrigger>
           <TabsTrigger value="map">Industry map</TabsTrigger>
         </TabsList>
 
@@ -175,6 +177,10 @@ export function VerifierDashboard() {
               </table>
             )}
           </div>
+        </TabsContent>
+
+        <TabsContent value="layout" className="mt-4">
+          <JeedimetlaLayoutMap />
         </TabsContent>
 
         <TabsContent value="map" className="mt-4">

@@ -1,88 +1,52 @@
 import { EmissionMap } from "@/components/EmissionMap";
-import { useEffect, useMemo, useState } from "react";
+import { JeedimetlaLayoutMap } from "@/components/JeedimetlaLayoutMap";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Activity, Grid3x3, Wind } from "lucide-react";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { POLLUTANTS, type Pollutant } from "@/lib/emissions";
-
-interface EmissionStatRow {
-  source_type: string;
-  value_kg_per_day: number;
-  pollutant: string;
-}
 
 export function PublicDashboard() {
-  const [gridCount, setGridCount] = useState(0);
-  const [emissions, setEmissions] = useState<EmissionStatRow[]>([]);
-  const [selectedPollutant, setSelectedPollutant] = useState<Pollutant>("PM10");
+  const [stats, setStats] = useState({ grids: 0, total: 0, sources: 0 });
 
   useEffect(() => {
-    const loadStats = async () => {
-      const [{ count }, { data }] = await Promise.all([
+    (async () => {
+      const [{ count: gc }, { data: e }] = await Promise.all([
         supabase.from("grids").select("*", { count: "exact", head: true }),
-        supabase.from("emissions").select("source_type,value_kg_per_day,pollutant"),
+        supabase.from("emissions").select("source_type,value_kg_per_day"),
       ]);
-      setGridCount(count ?? 0);
-      setEmissions((data ?? []) as EmissionStatRow[]);
-    };
-
-    void loadStats();
-
-    const channel = supabase
-      .channel("public-dashboard-emissions")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "emissions" },
-        () => {
-          void loadStats();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
+      const total = (e ?? []).reduce((a, r) => a + Number(r.value_kg_per_day), 0);
+      const sources = new Set((e ?? []).map((r) => r.source_type)).size;
+      setStats({ grids: gc ?? 0, total, sources });
+    })();
   }, []);
-
-  const stats = useMemo(() => {
-    const filtered = emissions.filter((row) => row.pollutant === selectedPollutant);
-    const total = filtered.reduce((sum, row) => sum + Number(row.value_kg_per_day), 0);
-    const sources = new Set(filtered.map((row) => row.source_type)).size;
-    return { total, sources };
-  }, [emissions, selectedPollutant]);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Jeedimetla Emission Grid</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Click any cell to see verified totals and source breakdown for the selected pollutant.
-          </p>
-        </div>
-        <div className="w-full max-w-[220px]">
-          <Label htmlFor="public-pollutant" className="mb-2 block">Pollutant</Label>
-          <Select value={selectedPollutant} onValueChange={(value) => setSelectedPollutant(value as Pollutant)}>
-            <SelectTrigger id="public-pollutant"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {POLLUTANTS.map((pollutant) => (
-                <SelectItem key={pollutant} value={pollutant}>
-                  {pollutant}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div>
+        <h1 className="text-2xl md:text-3xl font-bold">Jeedimetla Emission Grid</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Click any cell to see total PM10 and source breakdown.
+        </p>
       </div>
 
       <div className="grid sm:grid-cols-3 gap-4">
-        <StatCard icon={Grid3x3} label="Grid cells" value={gridCount.toString()} />
-        <StatCard icon={Activity} label={`Total ${selectedPollutant}`} value={`${stats.total.toFixed(0)} kg/day`} />
+        <StatCard icon={Grid3x3} label="Grid cells" value={stats.grids.toString()} />
+        <StatCard icon={Activity} label="Total PM10" value={`${stats.total.toFixed(0)} kg/day`} />
         <StatCard icon={Wind} label="Source types" value={stats.sources.toString()} />
       </div>
 
-      <EmissionMap selectedPollutant={selectedPollutant} />
+      <Tabs defaultValue="layout" className="w-full">
+        <TabsList>
+          <TabsTrigger value="layout">Survey layout</TabsTrigger>
+          <TabsTrigger value="geo">Geographic map</TabsTrigger>
+        </TabsList>
+        <TabsContent value="layout" className="mt-4">
+          <JeedimetlaLayoutMap />
+        </TabsContent>
+        <TabsContent value="geo" className="mt-4">
+          <EmissionMap />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
