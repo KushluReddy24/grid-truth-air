@@ -21,6 +21,7 @@ export type Database = {
           id: string
           industry_name: string | null
           pollutant: string
+          submission_id: string | null
           source_type: Database["public"]["Enums"]["source_type"]
           updated_at: string
           value_kg_per_day: number
@@ -31,6 +32,7 @@ export type Database = {
           id?: string
           industry_name?: string | null
           pollutant?: string
+          submission_id?: string | null
           source_type: Database["public"]["Enums"]["source_type"]
           updated_at?: string
           value_kg_per_day?: number
@@ -41,11 +43,19 @@ export type Database = {
           id?: string
           industry_name?: string | null
           pollutant?: string
+          submission_id?: string | null
           source_type?: Database["public"]["Enums"]["source_type"]
           updated_at?: string
           value_kg_per_day?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "emissions_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "emissions_grid_id_fkey"
             columns: ["grid_id"]

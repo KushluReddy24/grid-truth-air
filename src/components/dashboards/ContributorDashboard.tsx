@@ -11,10 +11,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { EmissionMap } from "@/components/EmissionMap";
+import { POLLUTANTS, type Pollutant } from "@/lib/emissions";
 
 const schema = z.object({
   grid_id: z.string().uuid("Select a grid"),
   source_type: z.enum(["industry", "transport", "domestic", "road_dust", "other"]),
+  pollutant: z.enum(POLLUTANTS),
   industry_name: z.string().max(150).optional(),
   value_kg_per_day: z.coerce.number().min(0).max(100000),
   notes: z.string().max(1000).optional(),
@@ -22,8 +24,15 @@ const schema = z.object({
 
 interface Grid { id: string; grid_code: string; area_name: string | null; }
 interface Submission {
-  id: string; grid_id: string; source_type: string; industry_name: string | null;
-  value_kg_per_day: number; status: string; created_at: string; review_comment: string | null;
+  id: string;
+  grid_id: string;
+  source_type: string;
+  industry_name: string | null;
+  pollutant: string;
+  value_kg_per_day: number;
+  status: string;
+  created_at: string;
+  review_comment: string | null;
 }
 
 export function ContributorDashboard() {
@@ -31,6 +40,7 @@ export function ContributorDashboard() {
   const [grids, setGrids] = useState<Grid[]>([]);
   const [subs, setSubs] = useState<Submission[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedPollutant, setSelectedPollutant] = useState<Pollutant>("PM10");
 
   const load = async () => {
     const [{ data: g }, { data: s }] = await Promise.all([
@@ -41,7 +51,7 @@ export function ContributorDashboard() {
     setSubs((s ?? []) as Submission[]);
   };
 
-  useEffect(() => { if (user) load(); }, [user]);
+  useEffect(() => { if (user) void load(); }, [user]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -49,32 +59,37 @@ export function ContributorDashboard() {
     const parsed = schema.safeParse({
       grid_id: fd.get("grid_id"),
       source_type: fd.get("source_type"),
+      pollutant: fd.get("pollutant"),
       industry_name: fd.get("industry_name") || undefined,
       value_kg_per_day: fd.get("value_kg_per_day"),
       notes: fd.get("notes") || undefined,
     });
+
     if (!parsed.success) {
       toast.error(parsed.error.issues[0].message);
       return;
     }
+
     setSubmitting(true);
     const { error } = await supabase.from("submissions").insert({
       contributor_id: user!.id,
       grid_id: parsed.data.grid_id,
       source_type: parsed.data.source_type,
       industry_name: parsed.data.industry_name,
+      pollutant: parsed.data.pollutant,
       value_kg_per_day: parsed.data.value_kg_per_day,
       notes: parsed.data.notes,
-      pollutant: "PM10",
     });
     setSubmitting(false);
+
     if (error) {
       toast.error(error.message);
-    } else {
-      toast.success("Submission sent for review");
-      (e.target as HTMLFormElement).reset();
-      load();
+      return;
     }
+
+    toast.success("Submission sent for review");
+    (e.target as HTMLFormElement).reset();
+    void load();
   };
 
   return (
@@ -96,11 +111,11 @@ export function ContributorDashboard() {
             <div>
               <Label htmlFor="grid_id">Grid cell</Label>
               <Select name="grid_id" required>
-                <SelectTrigger id="grid_id"><SelectValue placeholder="Select grid…" /></SelectTrigger>
+                <SelectTrigger id="grid_id"><SelectValue placeholder="Select grid..." /></SelectTrigger>
                 <SelectContent>
                   {grids.map((g) => (
                     <SelectItem key={g.id} value={g.id}>
-                      {g.grid_code} — {g.area_name}
+                      {g.grid_code} - {g.area_name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -120,20 +135,33 @@ export function ContributorDashboard() {
               </Select>
             </div>
             <div>
+              <Label htmlFor="pollutant">Pollutant</Label>
+              <Select name="pollutant" required defaultValue="PM10">
+                <SelectTrigger id="pollutant"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {POLLUTANTS.map((pollutant) => (
+                    <SelectItem key={pollutant} value={pollutant}>
+                      {pollutant}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label htmlFor="industry_name">Industry / source name (optional)</Label>
               <Input id="industry_name" name="industry_name" maxLength={150} />
             </div>
             <div>
-              <Label htmlFor="value_kg_per_day">PM10 (kg/day)</Label>
+              <Label htmlFor="value_kg_per_day">Emission value (kg/day)</Label>
               <Input id="value_kg_per_day" name="value_kg_per_day" type="number" step="0.1" min="0" required />
             </div>
             <div className="sm:col-span-2">
               <Label htmlFor="notes">Notes / methodology</Label>
-              <Textarea id="notes" name="notes" rows={3} maxLength={1000} placeholder="Stack tests, fuel consumption, traffic counts…" />
+              <Textarea id="notes" name="notes" rows={3} maxLength={1000} placeholder="Stack tests, fuel consumption, traffic counts..." />
             </div>
             <div className="sm:col-span-2">
               <Button type="submit" disabled={submitting} className="shadow-elegant">
-                {submitting ? "Submitting…" : "Submit for verification"}
+                {submitting ? "Submitting..." : "Submit for verification"}
               </Button>
             </div>
           </form>
@@ -149,6 +177,7 @@ export function ContributorDashboard() {
                   <tr>
                     <th className="px-4 py-3 text-left">Grid</th>
                     <th className="px-4 py-3 text-left">Source</th>
+                    <th className="px-4 py-3 text-left">Pollutant</th>
                     <th className="px-4 py-3 text-right">kg/day</th>
                     <th className="px-4 py-3 text-left">Status</th>
                     <th className="px-4 py-3 text-left">Reviewer note</th>
@@ -159,13 +188,14 @@ export function ContributorDashboard() {
                     const g = grids.find((x) => x.id === s.grid_id);
                     return (
                       <tr key={s.id} className="border-t border-border">
-                        <td className="px-4 py-3 font-medium">{g?.grid_code ?? "—"}</td>
-                        <td className="px-4 py-3 capitalize">{s.source_type.replace("_", " ")}{s.industry_name ? ` · ${s.industry_name}` : ""}</td>
+                        <td className="px-4 py-3 font-medium">{g?.grid_code ?? "-"}</td>
+                        <td className="px-4 py-3 capitalize">{s.source_type.replace("_", " ")}{s.industry_name ? ` - ${s.industry_name}` : ""}</td>
+                        <td className="px-4 py-3">{s.pollutant}</td>
                         <td className="px-4 py-3 text-right">{Number(s.value_kg_per_day).toFixed(1)}</td>
                         <td className="px-4 py-3">
                           <StatusBadge status={s.status} />
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground">{s.review_comment ?? "—"}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{s.review_comment ?? "-"}</td>
                       </tr>
                     );
                   })}
@@ -176,7 +206,22 @@ export function ContributorDashboard() {
         </TabsContent>
 
         <TabsContent value="map" className="mt-4">
-          <EmissionMap />
+          <div className="mb-4 flex justify-end">
+            <div className="w-full max-w-[220px]">
+              <Label htmlFor="contributor-map-pollutant" className="mb-2 block">Pollutant</Label>
+              <Select value={selectedPollutant} onValueChange={(value) => setSelectedPollutant(value as Pollutant)}>
+                <SelectTrigger id="contributor-map-pollutant"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {POLLUTANTS.map((pollutant) => (
+                    <SelectItem key={pollutant} value={pollutant}>
+                      {pollutant}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <EmissionMap selectedPollutant={selectedPollutant} />
         </TabsContent>
       </Tabs>
     </div>

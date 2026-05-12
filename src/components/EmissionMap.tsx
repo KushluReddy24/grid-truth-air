@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { MapContainer, TileLayer, Polygon, Polyline, CircleMarker, Tooltip, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { supabase } from "@/integrations/supabase/client";
-import { emissionColor, emissionLabel } from "@/lib/emissions";
+import { emissionColor, emissionLabel, type Pollutant } from "@/lib/emissions";
 import { GridDetailDialog } from "./GridDetailDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BOUNDARY, SURVEY_GRIDS } from "@/data/surveyArea";
@@ -19,6 +19,7 @@ export interface Grid {
 export interface EmissionRow {
   id: string;
   grid_id: string;
+  submission_id?: string | null;
   source_type: string;
   industry_name: string | null;
   pollutant: string;
@@ -52,7 +53,13 @@ function FitBounds() {
   return null;
 }
 
-export function EmissionMap() {
+export function EmissionMap({
+  refreshToken = 0,
+  selectedPollutant = "PM10",
+}: {
+  refreshToken?: number;
+  selectedPollutant?: Pollutant;
+}) {
   const { role } = useAuth();
   const isVerifier = role === "verifier";
 
@@ -63,7 +70,7 @@ export function EmissionMap() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
+    const loadMapData = async () => {
       const [gRes, eRes, iRes] = await Promise.all([
         supabase.from("grids").select("*"),
         supabase.from("emissions").select("*"),
@@ -75,16 +82,38 @@ export function EmissionMap() {
       setEmissions((eRes.data as EmissionRow[]) ?? []);
       setIndustries(((iRes as { data: IndustryPoint[] | null }).data) ?? []);
       setLoading(false);
-    })();
-  }, [isVerifier]);
+    };
+
+    void loadMapData();
+
+    const channel = supabase
+      .channel(`emissions-map-${role ?? "public"}-${refreshToken}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "emissions" },
+        () => {
+          void loadMapData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [isVerifier, refreshToken, role]);
+
+  const filteredEmissions = useMemo(
+    () => emissions.filter((e) => e.pollutant === selectedPollutant),
+    [emissions, selectedPollutant]
+  );
 
   const totals = useMemo(() => {
     const m = new Map<string, number>();
-    for (const e of emissions) {
+    for (const e of filteredEmissions) {
       m.set(e.grid_id, (m.get(e.grid_id) ?? 0) + Number(e.value_kg_per_day));
     }
     return m;
-  }, [emissions]);
+  }, [filteredEmissions]);
 
   const industriesByGrid = useMemo(() => {
     const m = new Map<string, IndustryPoint[]>();
@@ -115,18 +144,16 @@ export function EmissionMap() {
           scrollWheelZoom
         >
           <TileLayer
-            attribution='&copy; OpenStreetMap'
+            attribution="&copy; OpenStreetMap"
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <FitBounds />
 
-          {/* Survey area boundary (JEEDIMETLA IDA 19) */}
           <Polyline
             positions={BOUNDARY}
             pathOptions={{ color: "#22d3ee", weight: 3, opacity: 0.9, dashArray: "6 4" }}
           />
 
-          {/* Real surveyed grid cells from KML */}
           {SURVEY_GRIDS.map((sg) => {
             const dbGrid = gridByCode.get(sg.code);
             const total = dbGrid ? totals.get(dbGrid.id) ?? 0 : 0;
@@ -153,16 +180,15 @@ export function EmissionMap() {
                   <div className="text-xs">
                     <div className="font-semibold">Grid {sg.code}</div>
                     <div>
-                      {total.toFixed(1)} kg/day · {emissionLabel(total)}
+                      {total.toFixed(1)} kg/day - {emissionLabel(total)}
                     </div>
-                    <div className="text-muted-foreground">{indCount} industries</div>
+                    <div className="text-muted-foreground">{selectedPollutant} - {indCount} industries</div>
                   </div>
                 </Tooltip>
               </Polygon>
             );
           })}
 
-          {/* Industry markers */}
           {industries.map((ind) => {
             const isRed = ind.category === "red";
             return (
@@ -192,9 +218,8 @@ export function EmissionMap() {
           })}
         </MapContainer>
 
-        {/* Legend */}
         <div className="absolute bottom-4 right-4 z-[400] rounded-lg bg-card/95 backdrop-blur p-3 shadow-elegant border border-border">
-          <div className="text-xs font-semibold mb-2">PM10 (kg/day)</div>
+          <div className="text-xs font-semibold mb-2">{selectedPollutant} (kg/day)</div>
           <div className="h-2 w-32 rounded bg-gradient-emission mb-1" />
           <div className="flex justify-between text-[10px] text-muted-foreground mb-2">
             <span>Low</span>
@@ -215,7 +240,8 @@ export function EmissionMap() {
 
       <GridDetailDialog
         grid={selected}
-        emissions={emissions.filter((e) => e.grid_id === selected?.id)}
+        emissions={filteredEmissions.filter((e) => e.grid_id === selected?.id)}
+        selectedPollutant={selectedPollutant}
         industryCount={
           selected ? industriesByGrid.get(selected.id)?.length ?? 0 : 0
         }

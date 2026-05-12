@@ -20,3 +20,7 @@ export const SOURCE_LABELS: Record<string, string> = {
   road_dust: "Road Dust",
   other: "Other",
 };
+
+export const POLLUTANTS = ["PM2.5", "PM10", "NO2", "SO2", "CO"] as const;
+
+export type Pollutant = (typeof POLLUTANTS)[number];

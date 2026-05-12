@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { SOURCE_LABELS, emissionLabel, emissionColor } from "@/lib/emissions";
+import { SOURCE_LABELS, emissionLabel, emissionColor, type Pollutant } from "@/lib/emissions";
 import type { Grid, EmissionRow } from "./EmissionMap";
 import { Factory, Car, Home, Wind } from "lucide-react";
 
@@ -15,6 +15,7 @@ const ICONS: Record<string, React.ElementType> = {
 export function GridDetailDialog({
   grid,
   emissions,
+  selectedPollutant,
   industryCount,
   redIndustryCount,
   industryNames,
@@ -22,6 +23,7 @@ export function GridDetailDialog({
 }: {
   grid: Grid | null;
   emissions: EmissionRow[];
+  selectedPollutant: Pollutant;
   industryCount: number;
   redIndustryCount: number;
   industryNames: string[];
@@ -35,14 +37,13 @@ export function GridDetailDialog({
   const total = emissions.reduce((a, e) => a + Number(e.value_kg_per_day), 0);
   const color = emissionColor(total);
 
-  // Aggregate by source for non-verifiers
   const aggregated = canSeeIndustry
     ? emissions
     : Object.values(
         emissions.reduce<Record<string, EmissionRow>>((acc, e) => {
-          const k = e.source_type;
-          if (!acc[k]) acc[k] = { ...e, industry_name: null };
-          else acc[k] = { ...acc[k], value_kg_per_day: Number(acc[k].value_kg_per_day) + Number(e.value_kg_per_day) };
+          const key = `${e.source_type}-${e.pollutant}`;
+          if (!acc[key]) acc[key] = { ...e, industry_name: null };
+          else acc[key] = { ...acc[key], value_kg_per_day: Number(acc[key].value_kg_per_day) + Number(e.value_kg_per_day) };
           return acc;
         }, {})
       );
@@ -62,7 +63,7 @@ export function GridDetailDialog({
         </DialogHeader>
 
         <div className="rounded-xl bg-gradient-card border border-border p-4 mb-2">
-          <div className="text-xs uppercase tracking-wider text-muted-foreground">Total PM10</div>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground">Total {selectedPollutant}</div>
           <div className="flex items-baseline gap-2 mt-1">
             <div className="text-3xl font-bold">{total.toFixed(1)}</div>
             <div className="text-sm text-muted-foreground">kg/day</div>
@@ -92,7 +93,7 @@ export function GridDetailDialog({
           </div>
           {emissions.length === 0 && (
             <div className="text-xs text-muted-foreground rounded-lg border border-dashed border-border p-3">
-              No verified emissions recorded for this grid yet.
+              No verified {selectedPollutant} emissions recorded for this grid yet.
             </div>
           )}
           {aggregated.map((e) => {
@@ -108,7 +109,7 @@ export function GridDetailDialog({
                     <div className="text-sm font-medium truncate">
                       {SOURCE_LABELS[e.source_type] ?? e.source_type}
                       {canSeeIndustry && e.industry_name && (
-                        <span className="text-muted-foreground font-normal"> · {e.industry_name}</span>
+                        <span className="text-muted-foreground font-normal"> - {e.industry_name}</span>
                       )}
                     </div>
                     <div className="mt-1 h-1.5 w-full rounded bg-secondary overflow-hidden">

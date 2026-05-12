@@ -36,6 +36,18 @@ export default function AuthPage() {
     if (user) navigate("/dashboard", { replace: true });
   }, [user, navigate]);
 
+  const performLogin = async (email: string, password: string) => {
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setLoading(false);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Welcome back");
+      navigate("/dashboard");
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
@@ -44,18 +56,11 @@ export default function AuthPage() {
       toast.error(parsed.error.issues[0].message);
       return;
     }
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: parsed.data.email,
-      password: parsed.data.password,
-    });
-    setLoading(false);
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success("Welcome back");
-      navigate("/dashboard");
-    }
+    await performLogin(parsed.data.email, parsed.data.password);
+  };
+
+  const handleDemoLogin = async (userId: string, password: string) => {
+    await performLogin(userId, password);
   };
 
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -129,6 +134,30 @@ export default function AuthPage() {
                   {loading ? "Signing in…" : "Sign in"}
                 </Button>
               </form>
+
+              <div className="mt-6 pt-6 border-t border-border">
+                <p className="text-center text-xs text-muted-foreground mb-3 font-semibold">Demo Accounts</p>
+                <div className="space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full text-xs"
+                    disabled={loading}
+                    onClick={() => handleDemoLogin("MU012026", "contributor123")}
+                  >
+                    👤 Contributor Login
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full text-xs"
+                    disabled={loading}
+                    onClick={() => handleDemoLogin("pcb012026", "verifier123")}
+                  >
+                    ✓ Verifier Login
+                  </Button>
+                </div>
+              </div>
             </TabsContent>
 
             <TabsContent value="signup">
