@@ -55,8 +55,7 @@ const Index = () => {
               </span>
             </h1>
             <p className="mt-6 text-lg text-white/85 max-w-xl">
-              EMIQ is an open emissions intelligence platform for the Jeedimetla industrial cluster.
-              Explore PM10 hotspots, contribute survey data, and help verifiers build a transparent air-quality record.
+              EMIQ is an industrial emissions intelligence platform for the Jeedimetla industrial cluster that tracks and visualizes PM10, PM2.5, CO, NO₂, SO₂, and VOC emissions from industries, enabling transparent air-quality monitoring, hotspot detection, community reporting, and data-driven environmental accountability.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild size="lg" className="shadow-elegant">

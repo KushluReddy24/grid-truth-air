@@ -82,20 +82,24 @@ export function VerifierDashboard() {
     if (logError) { toast.error(logError.message); return; }
 
     if (action === "approved") {
-      const { error: emissionError } = await supabase.from("emissions").upsert({
-        submission_id: active.id,
+      const { error: emissionError } = await supabase.from("emissions").insert({
         grid_id: active.grid_id,
         source_type: active.source_type,
         industry_name: active.industry_name,
         pollutant: active.pollutant,
         value_kg_per_day: active.value_kg_per_day,
         confidence_score: confidence,
-      }, { onConflict: "submission_id" });
+      });
       if (emissionError) { toast.error(emissionError.message); return; }
     }
 
     if (action === "rejected") {
-      const { error: deleteError } = await supabase.from("emissions").delete().eq("submission_id", active.id);
+      const { error: deleteError } = await supabase.from("emissions").delete().match({
+        grid_id: active.grid_id,
+        source_type: active.source_type,
+        pollutant: active.pollutant,
+        industry_name: active.industry_name,
+      });
       if (deleteError) { toast.error(deleteError.message); return; }
     }
 
