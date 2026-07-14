@@ -43,11 +43,12 @@ export function Navbar() {
             </>
           ) : (
             <>
-              <Button variant="ghost" size="sm" onClick={() => navigate("/auth")}>
-                Login
+              <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
+                <LayoutDashboard className="h-4 w-4 mr-2" />
+                Public map
               </Button>
-              <Button size="sm" onClick={() => navigate("/auth?mode=signup")} className="shadow-elegant">
-                Get Started
+              <Button size="sm" onClick={() => navigate("/auth")} className="shadow-elegant">
+                Contributor / Verifier login
               </Button>
             </>
           )}
