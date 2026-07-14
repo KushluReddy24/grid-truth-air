@@ -17,6 +17,7 @@ export type Database = {
       areas: {
         Row: {
           boundary: Json
+          cell_size_deg: number
           center_lat: number
           center_lng: number
           created_at: string
@@ -31,6 +32,7 @@ export type Database = {
         }
         Insert: {
           boundary: Json
+          cell_size_deg?: number
           center_lat: number
           center_lng: number
           created_at?: string
@@ -45,6 +47,7 @@ export type Database = {
         }
         Update: {
           boundary?: Json
+          cell_size_deg?: number
           center_lat?: number
           center_lng?: number
           created_at?: string
