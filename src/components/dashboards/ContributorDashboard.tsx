@@ -12,6 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { EmissionMap } from "@/components/EmissionMap";
 import { JeedimetlaLayoutMap } from "@/components/JeedimetlaLayoutMap";
+import { useAreas } from "@/hooks/useAreas";
+import { AreaSwitcher } from "@/components/AreaSwitcher";
+import { useMemo } from "react";
 
 const schema = z.object({
   grid_id: z.string().uuid("Select a grid"),
@@ -29,20 +32,29 @@ interface Submission {
 
 export function ContributorDashboard() {
   const { user } = useAuth();
+  const { areas } = useAreas();
+  const [areaId, setAreaId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!areaId && areas.length) setAreaId(areas.find((a) => a.slug === "jeedimetla")?.id ?? areas[0].id);
+  }, [areas, areaId]);
+  const area = useMemo(() => areas.find((a) => a.id === areaId) ?? null, [areas, areaId]);
   const [grids, setGrids] = useState<Grid[]>([]);
   const [subs, setSubs] = useState<Submission[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   const load = async () => {
+    const gridQuery = area
+      ? supabase.from("grids").select("id,grid_code,area_name").eq("area_id", area.id).order("grid_code")
+      : supabase.from("grids").select("id,grid_code,area_name").order("grid_code");
     const [{ data: g }, { data: s }] = await Promise.all([
-      supabase.from("grids").select("id,grid_code,area_name").order("grid_code"),
+      gridQuery,
       supabase.from("submissions").select("*").eq("contributor_id", user!.id).order("created_at", { ascending: false }),
     ]);
     setGrids(g ?? []);
     setSubs((s ?? []) as Submission[]);
   };
 
-  useEffect(() => { if (user) load(); }, [user]);
+  useEffect(() => { if (user) load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [user, area?.id]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -80,9 +92,12 @@ export function ContributorDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold">Contributor Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">Submit field-survey emission data for verification.</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Contributor Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-1">Submit field-survey emission data and add industries. Click any grid on the geographic map to add an industry.</p>
+        </div>
+        <AreaSwitcher areas={areas} value={areaId} onChange={setAreaId} />
       </div>
 
       <Tabs defaultValue="submit">
@@ -182,7 +197,7 @@ export function ContributorDashboard() {
         </TabsContent>
 
         <TabsContent value="map" className="mt-4">
-          <EmissionMap />
+          <EmissionMap area={area} onIndustryAdded={load} />
         </TabsContent>
       </Tabs>
     </div>
