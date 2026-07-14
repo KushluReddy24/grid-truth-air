@@ -1,32 +1,52 @@
 import { EmissionMap } from "@/components/EmissionMap";
 import { JeedimetlaLayoutMap } from "@/components/JeedimetlaLayoutMap";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Activity, Grid3x3, Wind } from "lucide-react";
+import { useAreas } from "@/hooks/useAreas";
+import { AreaSwitcher } from "@/components/AreaSwitcher";
 
 export function PublicDashboard() {
+  const { areas } = useAreas();
+  const [areaId, setAreaId] = useState<string | null>(null);
   const [stats, setStats] = useState({ grids: 0, total: 0, sources: 0 });
 
   useEffect(() => {
+    if (!areaId && areas.length) {
+      setAreaId(areas.find((a) => a.slug === "jeedimetla")?.id ?? areas[0].id);
+    }
+  }, [areas, areaId]);
+
+  const area = useMemo(() => areas.find((a) => a.id === areaId) ?? null, [areas, areaId]);
+
+  useEffect(() => {
+    if (!areaId) return;
     (async () => {
-      const [{ count: gc }, { data: e }] = await Promise.all([
-        supabase.from("grids").select("*", { count: "exact", head: true }),
-        supabase.from("emissions").select("source_type,value_kg_per_day"),
+      const [{ count: gc, data: gridsData }, { data: e }] = await Promise.all([
+        supabase.from("grids").select("id", { count: "exact" }).eq("area_id", areaId),
+        supabase.from("emissions").select("source_type,value_kg_per_day,grid_id"),
       ]);
-      const total = (e ?? []).reduce((a, r) => a + Number(r.value_kg_per_day), 0);
-      const sources = new Set((e ?? []).map((r) => r.source_type)).size;
+      const gridIds = new Set((gridsData ?? []).map((g) => g.id));
+      const rows = (e ?? []).filter((r) => gridIds.has(r.grid_id));
+      const total = rows.reduce((a, r) => a + Number(r.value_kg_per_day), 0);
+      const sources = new Set(rows.map((r) => r.source_type)).size;
       setStats({ grids: gc ?? 0, total, sources });
     })();
-  }, []);
+  }, [areaId]);
+
+  const isJeedimetla = area?.slug === "jeedimetla";
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold">Jeedimetla Emission Grid</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Click any cell to see total PM10 and source breakdown.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">{area?.name ?? "Emissions"} Emission Grid</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Click any cell to see total PM10 and source breakdown. Public view — no sign-in required.
+          </p>
+        </div>
+        <AreaSwitcher areas={areas} value={areaId} onChange={setAreaId} />
       </div>
 
       <div className="grid sm:grid-cols-3 gap-4">
@@ -35,16 +55,18 @@ export function PublicDashboard() {
         <StatCard icon={Wind} label="Source types" value={stats.sources.toString()} />
       </div>
 
-      <Tabs defaultValue="layout" className="w-full">
+      <Tabs defaultValue={isJeedimetla ? "layout" : "geo"} className="w-full">
         <TabsList>
-          <TabsTrigger value="layout">Survey layout</TabsTrigger>
+          {isJeedimetla && <TabsTrigger value="layout">Survey layout</TabsTrigger>}
           <TabsTrigger value="geo">Geographic map</TabsTrigger>
         </TabsList>
-        <TabsContent value="layout" className="mt-4">
-          <JeedimetlaLayoutMap />
-        </TabsContent>
+        {isJeedimetla && (
+          <TabsContent value="layout" className="mt-4">
+            <JeedimetlaLayoutMap />
+          </TabsContent>
+        )}
         <TabsContent value="geo" className="mt-4">
-          <EmissionMap />
+          <EmissionMap area={area} />
         </TabsContent>
       </Tabs>
     </div>
