@@ -7,6 +7,9 @@ import { GridDetailDialog } from "./GridDetailDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BOUNDARY, SURVEY_GRIDS } from "@/data/surveyArea";
 import { useAuth } from "@/contexts/AuthContext";
+import type { Area } from "@/hooks/useAreas";
+import { cellPolygonFromCenter } from "@/lib/geo";
+import { AddIndustryDialog } from "./AddIndustryDialog";
 
 export interface Grid {
   id: string;
@@ -34,14 +37,15 @@ export interface IndustryPoint {
   lng: number;
   grid_id: string | null;
   name?: string | null;
+  is_verified?: boolean;
 }
 
-function FitBounds() {
+function FitBounds({ boundary }: { boundary: [number, number][] }) {
   const map = useMap();
   useEffect(() => {
-    if (!BOUNDARY.length) return;
-    const lats = BOUNDARY.map((c) => c[0]);
-    const lngs = BOUNDARY.map((c) => c[1]);
+    if (!boundary.length) return;
+    const lats = boundary.map((c) => c[0]);
+    const lngs = boundary.map((c) => c[1]);
     map.fitBounds(
       [
         [Math.min(...lats), Math.min(...lngs)],
@@ -49,45 +53,58 @@ function FitBounds() {
       ],
       { padding: [24, 24] }
     );
-  }, [map]);
+  }, [map, boundary]);
   return null;
 }
 
 export function EmissionMap({
   refreshToken = 0,
   selectedPollutant = "PM10",
+  area,
+  onIndustryAdded,
 }: {
   refreshToken?: number;
   selectedPollutant?: Pollutant;
+  area?: Area | null;
+  onIndustryAdded?: () => void;
 }) {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const isVerifier = role === "verifier";
+  const isContributor = role === "contributor";
+  const isJeedimetla = !area || area.slug === "jeedimetla";
+  const boundary = isJeedimetla ? BOUNDARY : (area!.boundary as [number, number][]);
+  const mapKey = area?.id ?? "jeedimetla";
 
   const [grids, setGrids] = useState<Grid[]>([]);
   const [emissions, setEmissions] = useState<EmissionRow[]>([]);
   const [industries, setIndustries] = useState<IndustryPoint[]>([]);
   const [selected, setSelected] = useState<Grid | null>(null);
+  const [addingIndustryGrid, setAddingIndustryGrid] = useState<Grid | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadMapData = async () => {
+      const gridQuery = area
+        ? supabase.from("grids").select("*").eq("area_id", area.id)
+        : supabase.from("grids").select("*");
+      const industryQuery = area
+        ? supabase.from("industries").select("id, category, lat, lng, grid_id, name, is_verified").eq("area_id", area.id)
+        : supabase.from("industries").select("id, category, lat, lng, grid_id, name, is_verified");
       const [gRes, eRes, iRes] = await Promise.all([
-        supabase.from("grids").select("*"),
+        gridQuery,
         supabase.from("emissions").select("*"),
-        isVerifier
-          ? supabase.from("industries").select("id, category, lat, lng, grid_id, name")
-          : (supabase.from("industries_public" as never).select("id, category, lat, lng, grid_id") as unknown as Promise<{ data: IndustryPoint[] | null }>),
+        industryQuery,
       ]);
       setGrids((gRes.data as Grid[]) ?? []);
       setEmissions((eRes.data as EmissionRow[]) ?? []);
-      setIndustries(((iRes as { data: IndustryPoint[] | null }).data) ?? []);
+      setIndustries(((iRes.data as unknown as IndustryPoint[]) ?? []));
       setLoading(false);
     };
 
     void loadMapData();
 
     const channel = supabase
-      .channel(`emissions-map-${role ?? "public"}-${refreshToken}`)
+      .channel(`emissions-map-${mapKey}-${role ?? "public"}-${refreshToken}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "emissions" },
@@ -95,12 +112,17 @@ export function EmissionMap({
           void loadMapData();
         }
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "industries" },
+        () => { void loadMapData(); }
+      )
       .subscribe();
 
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [isVerifier, refreshToken, role]);
+  }, [isVerifier, refreshToken, role, area?.id, mapKey, area]);
 
   const filteredEmissions = useMemo(
     () => emissions.filter((e) => e.pollutant === selectedPollutant),
@@ -138,8 +160,9 @@ export function EmissionMap({
     <>
       <div className="relative h-[500px] w-full rounded-xl overflow-hidden border border-border shadow-elegant">
         <MapContainer
-          center={[17.521, 78.452]}
-          zoom={14}
+          key={mapKey}
+          center={[area?.center_lat ?? 17.521, area?.center_lng ?? 78.452]}
+          zoom={area?.default_zoom ?? 14}
           className="h-full w-full"
           scrollWheelZoom
         >
@@ -147,23 +170,32 @@ export function EmissionMap({
             attribution="&copy; OpenStreetMap"
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <FitBounds />
+          <FitBounds boundary={boundary} />
 
           <Polyline
-            positions={BOUNDARY}
+            positions={boundary}
             pathOptions={{ color: "#22d3ee", weight: 3, opacity: 0.9, dashArray: "6 4" }}
           />
 
-          {SURVEY_GRIDS.map((sg) => {
-            const dbGrid = gridByCode.get(sg.code);
+          {(isJeedimetla
+            ? SURVEY_GRIDS.map((sg) => {
+                const dbGrid = gridByCode.get(sg.code);
+                return { key: sg.code, coords: sg.coords, dbGrid };
+              })
+            : grids.map((g) => ({
+                key: g.grid_code,
+                coords: cellPolygonFromCenter(g.lat, g.lng, area!.cell_size_deg),
+                dbGrid: g,
+              }))
+          ).map(({ key, coords, dbGrid }) => {
             const total = dbGrid ? totals.get(dbGrid.id) ?? 0 : 0;
             const indCount = dbGrid ? industriesByGrid.get(dbGrid.id)?.length ?? 0 : 0;
             const color = emissionColor(total);
             const baseOpacity = total > 0 ? 0.45 : 0.18;
             return (
               <Polygon
-                key={sg.code}
-                positions={sg.coords}
+                key={key}
+                positions={coords}
                 pathOptions={{
                   color,
                   weight: 2,
@@ -171,18 +203,23 @@ export function EmissionMap({
                   fillOpacity: baseOpacity,
                 }}
                 eventHandlers={{
-                  click: () => dbGrid && setSelected(dbGrid),
+                  click: () => {
+                    if (!dbGrid) return;
+                    if (isContributor && user) setAddingIndustryGrid(dbGrid);
+                    else setSelected(dbGrid);
+                  },
                   mouseover: (ev) => ev.target.setStyle({ fillOpacity: 0.7 }),
                   mouseout: (ev) => ev.target.setStyle({ fillOpacity: baseOpacity }),
                 }}
               >
                 <Tooltip direction="top" opacity={0.95} sticky>
                   <div className="text-xs">
-                    <div className="font-semibold">Grid {sg.code}</div>
+                    <div className="font-semibold">Grid {key}</div>
                     <div>
                       {total.toFixed(1)} kg/day - {emissionLabel(total)}
                     </div>
                     <div className="text-muted-foreground">{selectedPollutant} - {indCount} industries</div>
+                    {isContributor && <div className="text-primary font-semibold mt-1">Click to add industry</div>}
                   </div>
                 </Tooltip>
               </Polygon>
@@ -191,6 +228,7 @@ export function EmissionMap({
 
           {industries.map((ind) => {
             const isRed = ind.category === "red";
+            const unverified = ind.is_verified === false;
             return (
               <CircleMarker
                 key={ind.id}
@@ -199,16 +237,18 @@ export function EmissionMap({
                 pathOptions={{
                   color: isRed ? "#ef4444" : "#94a3b8",
                   fillColor: isRed ? "#ef4444" : "#cbd5e1",
-                  fillOpacity: 0.9,
+                  fillOpacity: unverified ? 0.4 : 0.9,
                   weight: 1,
+                  dashArray: unverified ? "3 3" : undefined,
                 }}
               >
                 <Tooltip direction="top" opacity={0.95}>
                   <div className="text-[11px]">
                     <span className="font-semibold">
                       {isRed ? "Red category" : "Industry"}
+                      {unverified ? " · pending" : ""}
                     </span>
-                    {isVerifier && ind.name && (
+                    {(isVerifier || isContributor) && ind.name && (
                       <div className="text-muted-foreground">{ind.name}</div>
                     )}
                   </div>
@@ -258,6 +298,13 @@ export function EmissionMap({
             : []
         }
         onClose={() => setSelected(null)}
+      />
+
+      <AddIndustryDialog
+        grid={addingIndustryGrid}
+        area={area ?? null}
+        onClose={() => setAddingIndustryGrid(null)}
+        onCreated={() => { setAddingIndustryGrid(null); onIndustryAdded?.(); }}
       />
     </>
   );
