@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      areas: {
+        Row: {
+          boundary: Json
+          center_lat: number
+          center_lng: number
+          created_at: string
+          created_by: string | null
+          default_zoom: number
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          boundary: Json
+          center_lat: number
+          center_lng: number
+          created_at?: string
+          created_by?: string | null
+          default_zoom?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          boundary?: Json
+          center_lat?: number
+          center_lng?: number
+          created_at?: string
+          created_by?: string | null
+          default_zoom?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       emissions: {
         Row: {
           confidence_score: number | null
@@ -57,6 +102,7 @@ export type Database = {
       }
       grids: {
         Row: {
+          area_id: string
           area_name: string | null
           created_at: string
           grid_code: string
@@ -65,6 +111,7 @@ export type Database = {
           lng: number
         }
         Insert: {
+          area_id: string
           area_name?: string | null
           created_at?: string
           grid_code: string
@@ -73,6 +120,7 @@ export type Database = {
           lng: number
         }
         Update: {
+          area_id?: string
           area_name?: string | null
           created_at?: string
           grid_code?: string
@@ -80,37 +128,61 @@ export type Database = {
           lat?: number
           lng?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "grids_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       industries: {
         Row: {
+          area_id: string | null
           category: string
           created_at: string
           grid_id: string | null
           id: string
+          is_verified: boolean
           lat: number
           lng: number
           name: string
+          submitted_by: string | null
         }
         Insert: {
+          area_id?: string | null
           category?: string
           created_at?: string
           grid_id?: string | null
           id?: string
+          is_verified?: boolean
           lat: number
           lng: number
           name: string
+          submitted_by?: string | null
         }
         Update: {
+          area_id?: string | null
           category?: string
           created_at?: string
           grid_id?: string | null
           id?: string
+          is_verified?: boolean
           lat?: number
           lng?: number
           name?: string
+          submitted_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "industries_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "industries_grid_id_fkey"
             columns: ["grid_id"]
