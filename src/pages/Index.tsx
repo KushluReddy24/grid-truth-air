@@ -64,7 +64,7 @@ const Index = () => {
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="bg-background/10 backdrop-blur border-white/30 text-white hover:bg-background/20 hover:text-white">
-                <Link to="/auth?mode=signup">Sign up to contribute</Link>
+                <Link to="/auth">Contributor / Verifier login</Link>
               </Button>
             </div>
           </div>
@@ -100,7 +100,7 @@ const Index = () => {
         <div className="rounded-2xl bg-gradient-hero p-10 md:p-14 text-center shadow-elegant">
           <h2 className="text-3xl md:text-4xl font-bold text-white">Ready to see Jeedimetla’s air?</h2>
           <p className="mt-3 text-white/85 max-w-xl mx-auto">
-            Open the live grid map — no account required to explore. Sign up to submit data or verify.
+            The public map is fully open — no sign-in required. Sign-in is only for contributors submitting field data and verifiers reviewing it.
           </p>
           <Button asChild size="lg" className="mt-6 bg-white text-primary hover:bg-white/90">
             <Link to="/dashboard">Open Map <ArrowRight className="ml-2 h-4 w-4" /></Link>
