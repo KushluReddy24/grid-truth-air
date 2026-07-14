@@ -15,6 +15,10 @@ import { StatusBadge } from "./ContributorDashboard";
 import { CheckCircle2, XCircle } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 import { POLLUTANTS, type Pollutant } from "@/lib/emissions";
+import { useAreas } from "@/hooks/useAreas";
+import { AreaSwitcher } from "@/components/AreaSwitcher";
+import { AreaManager } from "@/components/AreaManager";
+import { useMemo } from "react";
 
 interface Submission {
   id: string;
@@ -35,6 +39,12 @@ interface Grid { id: string; grid_code: string; area_name: string | null; }
 
 export function VerifierDashboard() {
   const { user } = useAuth();
+  const { areas } = useAreas();
+  const [areaId, setAreaId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!areaId && areas.length) setAreaId(areas.find((a) => a.slug === "jeedimetla")?.id ?? areas[0].id);
+  }, [areas, areaId]);
+  const area = useMemo(() => areas.find((a) => a.id === areaId) ?? null, [areas, areaId]);
   const [grids, setGrids] = useState<Grid[]>([]);
   const [subs, setSubs] = useState<Submission[]>([]);
   const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
@@ -121,6 +131,7 @@ export function VerifierDashboard() {
       <Tabs defaultValue="queue">
         <TabsList>
           <TabsTrigger value="queue">Review queue</TabsTrigger>
+          <TabsTrigger value="areas">Areas</TabsTrigger>
           <TabsTrigger value="layout">Survey layout</TabsTrigger>
           <TabsTrigger value="map">Industry map</TabsTrigger>
         </TabsList>
@@ -183,12 +194,17 @@ export function VerifierDashboard() {
           </div>
         </TabsContent>
 
+        <TabsContent value="areas" className="mt-4">
+          <AreaManager />
+        </TabsContent>
+
         <TabsContent value="layout" className="mt-4">
           <JeedimetlaLayoutMap />
         </TabsContent>
 
         <TabsContent value="map" className="mt-4">
-          <div className="mb-4 flex justify-end">
+          <div className="mb-4 flex flex-wrap justify-between gap-4">
+            <AreaSwitcher areas={areas} value={areaId} onChange={setAreaId} />
             <div className="w-full max-w-[220px]">
               <Label htmlFor="verifier-map-pollutant" className="mb-2 block">Pollutant</Label>
               <Select value={selectedPollutant} onValueChange={(value) => setSelectedPollutant(value as Pollutant)}>
@@ -203,7 +219,7 @@ export function VerifierDashboard() {
               </Select>
             </div>
           </div>
-          <EmissionMap refreshToken={mapRefreshToken} selectedPollutant={selectedPollutant} />
+          <EmissionMap refreshToken={mapRefreshToken} selectedPollutant={selectedPollutant} area={area} />
         </TabsContent>
       </Tabs>
 
